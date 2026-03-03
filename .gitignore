@@ -1,4 +1,83 @@
-id_rsa
-id_rsa.pub
-/UserData/**
-README.html
+####################################
+# R / RStudio
+####################################
+
+.Rhistory
+.RData
+.Ruserdata
+.Rproj.user/
+*.Rproj
+
+####################################
+# renv
+####################################
+
+# renv library (platform-specific, large)
+renv/library/
+renv/staging/
+
+# keep renv.lock and renv/activate.R!
+!renv.lock
+!renv/activate.R
+
+####################################
+# Environment / Secrets
+####################################
+
+.env
+.env.*
+!.env.example
+
+####################################
+# Shiny / Runtime
+####################################
+
+shinyapps/
+rsconnect/
+*.log
+
+####################################
+# Data (local / generated)
+####################################
+
+data/raw/
+data/tmp/
+data/cache/
+data/*.rds
+data/*.csv
+data/*.xlsx
+
+####################################
+# Outputs / Reports
+####################################
+
+plots/
+figures/
+reports/
+*.html
+*.pdf
+
+####################################
+# OS / Editor
+####################################
+
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+####################################
+# Python / Conda (falls vorhanden)
+####################################
+
+__pycache__/
+*.pyc
+.envrc
+
+####################################
+# Misc
+####################################
+
+.cache/
+tmp/
