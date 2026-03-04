@@ -24,6 +24,7 @@ renv/staging/
 # Environment / Secrets
 ####################################
 
+credentials.env
 .env
 .env.*
 !.env.example
@@ -81,3 +82,7 @@ __pycache__/
 
 .cache/
 tmp/
+
+
+id_rsa
+id_rsa.pub

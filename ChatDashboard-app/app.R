@@ -59,7 +59,7 @@ consent_message <- NA
 # variable to control whether to use forwarding per url parameter or rely on pre-defined credentials for authentication
 # TODO: If you are using url parameter forwarding, you need to adapt line 879 to extract the participant ID from your referral link.
 # Default structure is: www.example-website.com/ChatDashboard?id=TestParticipant | Extracts: TestParticipant
-use_forwarding <- TRUE # TODO: Change back to false
+use_forwarding <- FALSE # TODO: Change back to false
 
 # Password to use for forwarding via url-parameter (only used if use_forwarding == TRUE)
 # TODO: Set this as a character string in line 880
@@ -116,13 +116,52 @@ Colnames_exclude_pii <- c("Sender",
 ################################### HANDLING SHINY MANAGER CREDENTILAS ####
 
 # Switch for running local (FALSE) vs online (TRUE)
-running_online = FALSE
-if (running_online == TRUE) {.libPaths("YOUR-LIB-PATH-HERE")}
-# TODO: Add library path of server here if running online
+running_online <- FALSE
+if (running_online == TRUE) {
+  .libPaths("YOUR-LIB-PATH-HERE")
+}
 
-# loading credentials from external file
-credentials <- readRDS("credentials.rds")
+# ------------------------------------------------------------------
+# Load credentials from .env and build credentials data.frame
+# ------------------------------------------------------------------
 
+# load env file
+dotenv::load_dot_env(file = "credentials.env")
+
+# helper: read numbered env vars safely
+read_user <- function(i) {
+  name     <- Sys.getenv(paste0("USER", i, "_NAME"))
+  password <- Sys.getenv(paste0("USER", i, "_PASSWORD"))
+  comment  <- Sys.getenv(paste0("USER", i, "_COMMENT"))
+  
+  if (name == "" || password == "") return(NULL)
+  
+  data.frame(
+    user     = name,
+    password = password,
+    start    = as.Date("2019-04-15"),  # fixed valid Date
+    expire   = NA,                     # logical NA
+    admin    = FALSE,
+    comment  = comment,
+    stringsAsFactors = FALSE
+  )
+}
+
+# build credentials table
+credentials_list <- lapply(1:20, read_user)
+credentials_list <- Filter(Negate(is.null), credentials_list)
+
+credentials <- do.call(rbind, credentials_list)
+
+# sanity check (optional, but recommended)
+stopifnot(
+  is.character(credentials$user),
+  is.character(credentials$password),
+  inherits(credentials$start, "Date"),
+  is.logical(credentials$expire),
+  is.logical(credentials$admin),
+  is.character(credentials$comment)
+)
 
 ################################### MAKING FONT FOR EMOJI PLOTTING AVAILABLE ####
 if (file.exists("~/.fonts/NotoColorEmoji.ttf")) {
