@@ -10,6 +10,20 @@
 #  - Private keys MUST NEVER be committed or shared
 # ============================================================
 
+# ============================================================
+# Activate renv for reproducible package environment
+# ============================================================
+
+# renv is stored in project root
+renv_activate_path <- file.path("..", "renv", "activate.R")
+if (file.exists(renv_activate_path)) {
+  source(renv_activate_path)
+} else {
+  message("⚠️ renv/activate.R not found; using system libraries")
+}
+
+
+
 library(cyphr)
 library(fs)
 
