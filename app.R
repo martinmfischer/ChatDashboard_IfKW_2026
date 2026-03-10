@@ -1,18 +1,14 @@
 ###################################################################################### CHATDASHBOARD SETUP #####
 
-# # renv is stored in project root
-# renv_activate_path <- file.path("..", "renv", "activate.R")
-# if (file.exists(renv_activate_path)) {
-#   source(renv_activate_path)
-# } else {
-#   message("⚠️ renv/activate.R not found; using system libraries")
-# }
-# 
-# 
+if (file.exists("renv/activate.R")) {
+  source("renv/activate.R")
+}
 
 
 ################################### LOADING LIBRARIES ####
+library(jsonlite)
 library(anytime)
+
 library(crosstalk)
 library(cyphr)
 library(digest)
