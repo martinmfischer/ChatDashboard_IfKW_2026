@@ -10,19 +10,6 @@
 #  - Private keys MUST NEVER be committed or shared
 # ============================================================
 
-# ============================================================
-# Activate renv for reproducible package environment
-# ============================================================
-
-# renv is stored in project root
-renv_activate_path <- file.path("..", "renv", "activate.R")
-if (file.exists(renv_activate_path)) {
-  source(renv_activate_path)
-} else {
-  message("⚠️ renv/activate.R not found; using system libraries")
-}
-
-
 
 library(cyphr)
 library(fs)
@@ -34,7 +21,7 @@ cat("=========================================\n\n")
 # Configuration
 # ------------------------------------------------------------------
 researcher_dir <- "Researcher_Keypair"                        # Local / Researcher keys
-server_dir     <- "./ChatDashboard-app/ServerFolder"          # Deployment / Server keys
+server_dir     <- "ServerFolder"          # Deployment / Server keys
 
 # ------------------------------------------------------------------
 # Step 1: Generate key pairs (idempotent)
