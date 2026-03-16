@@ -101,7 +101,7 @@ You can select senders, set the minimum frequency of a link, and specify the tim
 62,NA,"Chat log hochladen, um eine Liste der Absender anzuzeigen",Upload chat log to see List of Senders
 63,NA,Mindesthäufigkeit auswählen,Select minimum frequency
 64,NA,"Sie können den Schieberegler unten ziehen und fallen lassen, um die Mindestanzahl einzustellen, die Dömanen in der Konversation vorkommen müssen, damit sie in den Diagrammen auf der rechten Seite angezeigt werden. Wenn Ihre Diagramme unübersichtlich aussehen, versuchen Sie, diese Zahl zu erhöhen oder zu verringern.","You can drag and drop the slider below to set the minimum count at which domains appear in the conversation on the right-hand side. If your charts look cluttered, try increasing or decreasing this number."
-65,NA,Dömanen gesendeter Links,Domains of sent links
+65,NA,Domänen gesendeter Links,Domains of sent links
 66,NA,Smilies,Smilies
 67,NA,"Auf der rechten Seite können Sie sehen, wie oft welche Smilies von wem und wann benutzt werden. In diesem Panel können Sie die Einstellungen für die Diagramme auf der rechten Seite anpassen.
                                                                              Sie können die Absender, die Mindesthäufigkeit eines Smilies und den Zeitrahmen für die Analyse festlegen.","On the right-hand side, you can see how often different smilies are used by whom and when. In this panel, you can adjust the settings for the charts on the right-hand side.

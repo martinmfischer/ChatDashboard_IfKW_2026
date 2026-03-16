@@ -8,7 +8,9 @@ if (file.exists("renv/activate.R")) {
 ################################### LOADING LIBRARIES ####
 library(jsonlite)
 library(anytime)
-
+library(urltools)
+library(purrr)
+library(dplyr)
 library(crosstalk)
 library(cyphr)
 library(digest)
@@ -105,11 +107,9 @@ Colnames_exclude_pii <- c("Sender",
                           "Message",
                           "Message_simplified",
                           "Message_words",
-                          "Links",
                           "Media",
                           "Locations",
                           "System_messages")
-
 
 
 # Shiny Debugging Options (uncomment these to debug the app)
@@ -117,8 +117,49 @@ Colnames_exclude_pii <- c("Sender",
 # options(shiny.trace = TRUE)
 
 
+### Helper function for style selection ###
+
+make_picker_styles <- function(cols){
+  ifelse(cols %in% Colnames_exclude_pii,
+         "background:lightgrey;color:black",
+         "color:black;font-weight:bold;")
+}
 
 
+#' Reduce WhatsApp Links to Base Domains, overwrite original column, filter blacklist
+#'
+#' @param chat_df data.frame von WhatsR parse
+#' @param link_col Spalte mit Links (default "URL")
+#' @param blacklist optional Vektor von Domains, die rausgefiltert werden sollen
+#' @return data.frame mit geänderten Links-Spalten
+process_links <- function(chat_df, link_col = "URL", blacklist = NULL) {
+  
+  if (!link_col %in% colnames(chat_df)) {
+    stop(paste("Spalte", link_col, "existiert nicht im DataFrame"))
+  }
+  
+  # map die Liste jeder Zeile auf Character und extrahiere Domains
+  chat_df[[link_col]] <- map(chat_df[[link_col]], function(links) {
+    # links ist ggf. NA oder NULL oder Liste
+    if (is.null(links) || all(is.na(links))) return(character(0))
+    
+    # entlisten falls nötig
+    links <- unlist(links)
+    links <- links[!is.na(links)]
+    if (length(links) == 0) return(character(0))
+    
+    # domain extrahieren
+    domains <- url_parse(links)$domain
+    domains <- gsub("^(?:.*\\.)?([^.]+\\.[^.]+)$", "\\1", domains)
+    
+    # blacklist filtern
+    if (!is.null(blacklist)) domains <- domains[!domains %in% blacklist]
+    
+    unique(domains)
+  })
+  
+  return(chat_df)
+}
 
 ################################### HANDLING SHINY MANAGER CREDENTILAS ####
 
@@ -455,6 +496,7 @@ ui <- fluidPage(theme  = shinytheme("flatly"),
                                       helpText(display_text[33]),
                                       pickerInput("show_vars",
                                                   display_text[34],
+                                                  #choices = c(""),
                                                   choices = c(""),
                                                   selected = c(""),
                                                   label = display_text[35],
@@ -463,8 +505,8 @@ ui <- fluidPage(theme  = shinytheme("flatly"),
                                                                               "background:lightgrey;color:black",
                                                                               "color:black;font-weight: bold;",
                                                                               "background:lightgrey;color:black",
-                                                                              "background:lightgrey;color:black",
-                                                                              "background:lightgrey;color:black",
+                                                                              "color:black;font-weight: bold;",
+                                                                              "color:black;font-weight: bold;",
                                                                               "background:lightgrey;color:black",
                                                                               "color:black;font-weight: bold;",
                                                                               "background:lightgrey;color:black",
@@ -906,71 +948,71 @@ server <- function(input, output, session) {
 
   # creating empty reactive value for storing uploaded data
   rv <- reactiveValues(data = NULL)
-  
-  # Ask "reason to leave question"
-  # Exit-intent questionnaire (multi-select, random order; CSV named with ID+timestamp)
-  base_reasons <- c(display_text[92],display_text[93],display_text[94],display_text[95])
-  other_label  <- display_text[96]
-  
-  observeEvent(input$exit_intent, {
-    choices <- c(sample(base_reasons), other_label)
-    showModal(modalDialog(
-      title = display_text[97],
-      tags$p(display_text[98]),
-      tags$p(display_text[99]),
-      checkboxGroupInput("reasons", NULL, choices = choices, selected = character(0)),
-      conditionalPanel(
-        paste0("input.reasons && input.reasons.includes('", other_label, "')"),
-        textAreaInput("reason_free", NULL, placeholder = "Freitext", width = "100%", height = "120px")
-      ),
-      footer = tagList(
-        actionButton("reason_cancel", display_text[100]),
-        actionButton("reason_submit",display_text[101], class = "btn-primary")
-      ),
-      easyClose = FALSE
-    ))
-    shinyjs::disable("reason_submit")
-  })
-  
-  # enable submit only when valid
-  observe({
-    sel <- if (is.null(input$reasons)) character(0) else input$reasons
-    need_free <- other_label %in% sel
-    ok <- length(sel) > 0 && (!need_free || nzchar(if (is.null(input$reason_free)) "" else input$reason_free))
-    if (ok) shinyjs::enable("reason_submit") else shinyjs::disable("reason_submit")
-  })
-  
-  observeEvent(input$reason_cancel, {
-    removeModal()
-    shinyjs::runjs("window.modalOpen=false;") # allow re-fire later
-  })
-  
-  observeEvent(input$reason_submit, {
-    sel <- req(input$reasons)
-    
-    # Always use shinymanager username; make it OS-safe
-    id_raw <- tryCatch(reactiveValuesToList(res_auth)$user, error = function(e) "")
-    pid    <- if (nzchar(id_raw)) gsub("[^A-Za-z0-9_-]", "_", id_raw) else "UNKNOWN"
-    
-    ts     <- format(Sys.time(), "%Y-%m-%d_%H-%M-%S")
-    outdir <- "./UserData/ClosingReasons"
-    dir.create(outdir, recursive = TRUE, showWarnings = FALSE)
-    csv_fn <- file.path(outdir, sprintf("CLOSING_REASONS_%s_%s.csv", pid, ts))
-    
-    other_txt <- if (other_label %in% sel) gsub("[\r\n]+"," ", input$reason_free %||% "") else ""
-    
-    row <- data.frame(ID = pid, timestamp = ts, other_reason = other_txt, check.names = FALSE)
-    for (r in base_reasons) row[[r]] <- as.integer(r %in% sel)
-    row[[other_label]] <- as.integer(other_label %in% sel)
-    
-    write.csv(row, file = csv_fn, row.names = FALSE, fileEncoding = "UTF-8")
-    
-    removeModal()
-    shinyjs::runjs("window.stopExitIntent=true; window.modalOpen=false; window.armExit=false;") # never refire after one answer
-  })
-  
-  
-  
+  # 
+  # # Ask "reason to leave question" - currently disabled because it is annoying
+  # # Exit-intent questionnaire (multi-select, random order; CSV named with ID+timestamp)
+  # base_reasons <- c(display_text[92],display_text[93],display_text[94],display_text[95])
+  # other_label  <- display_text[96]
+  # 
+  # observeEvent(input$exit_intent, {
+  #   choices <- c(sample(base_reasons), other_label)
+  #   showModal(modalDialog(
+  #     title = display_text[97],
+  #     tags$p(display_text[98]),
+  #     tags$p(display_text[99]),
+  #     checkboxGroupInput("reasons", NULL, choices = choices, selected = character(0)),
+  #     conditionalPanel(
+  #       paste0("input.reasons && input.reasons.includes('", other_label, "')"),
+  #       textAreaInput("reason_free", NULL, placeholder = "Freitext", width = "100%", height = "120px")
+  #     ),
+  #     footer = tagList(
+  #       actionButton("reason_cancel", display_text[100]),
+  #       actionButton("reason_submit",display_text[101], class = "btn-primary")
+  #     ),
+  #     easyClose = FALSE
+  #   ))
+  #   shinyjs::disable("reason_submit")
+  # })
+  # 
+  # # enable submit only when valid
+  # observe({
+  #   sel <- if (is.null(input$reasons)) character(0) else input$reasons
+  #   need_free <- other_label %in% sel
+  #   ok <- length(sel) > 0 && (!need_free || nzchar(if (is.null(input$reason_free)) "" else input$reason_free))
+  #   if (ok) shinyjs::enable("reason_submit") else shinyjs::disable("reason_submit")
+  # })
+  # 
+  # observeEvent(input$reason_cancel, {
+  #   removeModal()
+  #   shinyjs::runjs("window.modalOpen=false;") # allow re-fire later
+  # })
+  # 
+  # observeEvent(input$reason_submit, {
+  #   sel <- req(input$reasons)
+  #   
+  #   # Always use shinymanager username; make it OS-safe
+  #   id_raw <- tryCatch(reactiveValuesToList(res_auth)$user, error = function(e) "")
+  #   pid    <- if (nzchar(id_raw)) gsub("[^A-Za-z0-9_-]", "_", id_raw) else "UNKNOWN"
+  #   
+  #   ts     <- format(Sys.time(), "%Y-%m-%d_%H-%M-%S")
+  #   outdir <- "./UserData/ClosingReasons"
+  #   dir.create(outdir, recursive = TRUE, showWarnings = FALSE)
+  #   csv_fn <- file.path(outdir, sprintf("CLOSING_REASONS_%s_%s.csv", pid, ts))
+  #   
+  #   other_txt <- if (other_label %in% sel) gsub("[\r\n]+"," ", input$reason_free %||% "") else ""
+  #   
+  #   row <- data.frame(ID = pid, timestamp = ts, other_reason = other_txt, check.names = FALSE)
+  #   for (r in base_reasons) row[[r]] <- as.integer(r %in% sel)
+  #   row[[other_label]] <- as.integer(other_label %in% sel)
+  #   
+  #   write.csv(row, file = csv_fn, row.names = FALSE, fileEncoding = "UTF-8")
+  #   
+  #   removeModal()
+  #   shinyjs::runjs("window.stopExitIntent=true; window.modalOpen=false; window.armExit=false;") # never refire after one answer
+  # })
+  # 
+  # 
+  # 
 
   ################################### STYLING, BUTTONS, HIDE/UNHIDE ELEMENTS ####
 
@@ -1108,6 +1150,7 @@ server <- function(input, output, session) {
     rv$data <- parse_chat(path = input$file$datapath,
                           anonymize = "add",
                           consent = consent_message)
+    rv$data <- rv$data %>% process_links()
 
     # saving old column names
     rv$FunctionColnames <- colnames(rv$data)
@@ -1233,26 +1276,8 @@ server <- function(input, output, session) {
       updatePickerInput(session,
                         "show_vars",
                         choices = colnames(rv$data),
-                        selected = colnames(rv$data)[c(1,3,8,10,12,13,14,15,17:19)],
-                        choicesOpt = list(style = c("color:black;font-weight: bold;",
-                                                    "background:lightgrey;color:black",
-                                                    "color:black;font-weight: bold;",
-                                                    "background:lightgrey;color:black",
-                                                    "background:lightgrey;color:black",
-                                                    "background:lightgrey;color:black",
-                                                    "background:lightgrey;color:black",
-                                                    "color:black;font-weight: bold;",
-                                                    "background:lightgrey;color:black",
-                                                    "color:black;font-weight: bold;",
-                                                    "background:lightgrey;color:black",
-                                                    "color:black;font-weight: bold;",
-                                                    "color:black;font-weight: bold;",
-                                                    "color:black;font-weight: bold;",
-                                                    "color:black;font-weight: bold;",
-                                                    "background:lightgrey;color:black",
-                                                    "color:black;font-weight: bold;",
-                                                    "color:black;font-weight: bold;",
-                                                    "color:black;font-weight: bold;")))
+                        selected = setdiff(colnames(rv$data), Colnames_exclude_pii),
+                        choicesOpt = list(style = make_picker_styles(colnames(rv$data))))
     # end outer else
     }
   
@@ -1446,26 +1471,8 @@ server <- function(input, output, session) {
     updatePickerInput(session,
                       "show_vars",
                       choices = colnames(rv$data),
-                      selected = colnames(rv$data)[c(1,3,8,10,12,13,14,15,17:19)],
-                      choicesOpt = list(style = c("color:black;font-weight: bold;",
-                                                  "background:lightgrey;color:black",
-                                                  "color:black;font-weight: bold;",
-                                                  "background:lightgrey;color:black",
-                                                  "background:lightgrey;color:black",
-                                                  "background:lightgrey;color:black",
-                                                  "background:lightgrey;color:black",
-                                                  "color:black;font-weight: bold;",
-                                                  "background:lightgrey;color:black",
-                                                  "color:black;font-weight: bold;",
-                                                  "background:lightgrey;color:black",
-                                                  "color:black;font-weight: bold;",
-                                                  "color:black;font-weight: bold;",
-                                                  "color:black;font-weight: bold;",
-                                                  "color:black;font-weight: bold;",
-                                                  "background:lightgrey;color:black",
-                                                  "color:black;font-weight: bold;",
-                                                  "color:black;font-weight: bold;",
-                                                  "color:black;font-weight: bold;")))
+                      selected = setdiff(colnames(rv$data), Colnames_exclude_pii),
+                      choicesOpt = list(style = make_picker_styles(colnames(rv$data))))
     
     ### Updating selection of donor
     updateSelectInput(session,
