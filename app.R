@@ -107,6 +107,7 @@ Colnames_exclude_pii <- c("Sender",
                           "Message",
                           "Message_simplified",
                           "Message_words",
+                          "Links",
                           "Media",
                           "Locations",
                           "System_messages")
@@ -134,30 +135,25 @@ make_picker_styles <- function(cols){
 #' @return data.frame mit geänderten Links-Spalten
 process_links <- function(chat_df, link_col = "URL", blacklist = NULL) {
   
-  if (!link_col %in% colnames(chat_df)) {
-    stop(paste("Spalte", link_col, "existiert nicht im DataFrame"))
-  }
-  
-  # map die Liste jeder Zeile auf Character und extrahiere Domains
-  chat_df[[link_col]] <- map(chat_df[[link_col]], function(links) {
-    # links ist ggf. NA oder NULL oder Liste
-    if (is.null(links) || all(is.na(links))) return(character(0))
-    
-    # entlisten falls nötig
-    links <- unlist(links)
-    links <- links[!is.na(links)]
-    if (length(links) == 0) return(character(0))
-    
-    # domain extrahieren
-    domains <- url_parse(links)$domain
-    domains <- gsub("^(?:.*\\.)?([^.]+\\.[^.]+)$", "\\1", domains)
-    
-    # blacklist filtern
-    if (!is.null(blacklist)) domains <- domains[!domains %in% blacklist]
-    
-    unique(domains)
-  })
-  
+  # if (!link_col %in% colnames(chat_df)) stop("Spalte existiert nicht")
+  # 
+  # chat_df[[link_col]] <- map(chat_df[[link_col]], function(links) {
+  #   if (is.null(links) || all(is.na(links))) return(NA_character_)
+  #   
+  #   links <- unlist(links)
+  #   links <- links[!is.na(links)]
+  #   if (length(links) == 0) return(NA_character_)
+  #   
+  #   domains <- url_parse(links)$domain
+  #   domains <- gsub("^(?:.*\\.)?([^.]+\\.[^.]+)$", "\\1", domains)
+  #   
+  #   if (!is.null(blacklist)) domains <- domains[!domains %in% blacklist]
+  #   
+  #   if (length(domains) == 0) return(NA_character_)
+  #   
+  #   paste(unique(domains), collapse = ",")  # optional: direkt als String für plot_links
+  # })
+  # 
   return(chat_df)
 }
 
